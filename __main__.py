@@ -118,7 +118,7 @@ class Scraper:
                                              r'.]*\)|[A-Z0-9+&@#\/%=~_|$])'
             urls_on_page = re.findall(all_web_or_relative_urls_regex, split_response[1], re.IGNORECASE | re.MULTILINE)
             for index, url in enumerate(urls_on_page):
-                if not url.startswith(current_scheme_prefix):
+                if not (url.startswith('http://') or url.startswith('https://')):
                     urls_on_page[index] = current_scheme_prefix + url
             return urls_on_page
 
