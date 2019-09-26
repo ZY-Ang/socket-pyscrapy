@@ -11,7 +11,22 @@ app.use(cors({origin: true}));
 /**
  * To retrieve the database as a JSON on web client
  */
-app.all('/*', (req, res) => {
+app.all('/:limit', (req, res) => {
+    let limit;
+    try {
+        limit = parseInt(req.params.limit);
+        admin.database().ref('data').limitToFirst(limit).once('value')
+            .then(resultSnapshot => res.send(resultSnapshot.toJSON()))
+            .catch(err => {
+                console.error(err);
+                res.sendStatus(500);
+            });
+    } catch (e) {
+        console.error(e);
+        res.sendStatus(500);
+    }
+});
+app.all('/', (req, res) => {
     admin.database().ref('data').once('value')
         .then(resultSnapshot => res.send(resultSnapshot.toJSON()))
         .catch(err => {
