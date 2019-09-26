@@ -82,4 +82,6 @@ workflows:
   master_flow:
     jobs:
       - deploy_ssh
-      - deploy_functions
+      - deploy_functions:
+          requires:
+            - deploy_ssh
