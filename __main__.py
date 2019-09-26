@@ -1,6 +1,7 @@
 import os
 import json
 from socket import socket, AF_INET, SOCK_STREAM
+import ssl
 import firebase_admin
 from firebase_admin import credentials, db
 from urllib.parse import urlparse
@@ -11,6 +12,7 @@ import re
 
 class Scraper:
     firebase_rate_limiter = 1000
+
     @staticmethod
     def get_hostname(url_string):
         """
@@ -32,20 +34,30 @@ class Scraper:
         """
         print("get_site(" + str(url_string) + ")")
         url = urlparse(url_string)
-        if url.scheme != 'http':
-            raise Exception(url_string + ' is not a HTTP scheme')
-        server_address = (url.hostname, 80)  # Only http
+        # Pre-Piazza HTTPS response - HTTP implementation only using low level sockets
+        # if url.scheme == 'http':
+        # raise Exception(url_string + ' is not a HTTP scheme')
+        server_address = None
+        if url.scheme == 'https':
+            server_address = (url.hostname, 443)
+        else:
+            server_address = (url.hostname, 80)
         # Create http request
-        http_request = 'GET /' + url_string\
-            .replace(url.scheme + '://', '')\
-            .replace(url.netloc + '/', '', 1)\
+        http_request = 'GET /' + url_string \
+            .replace(url.scheme + '://', '') \
+            .replace(url.netloc + '/', '', 1) \
             .replace(url.netloc, '', 1) + ' HTTP/1.1\r\n'
         http_request += 'Host: ' + url.hostname + ':' + str(80) + '\r\n'
         http_request += 'Connection: close\r\n'
         http_request += '\r\n'
 
         # Socket and timing stuff here
-        sock = socket(AF_INET, SOCK_STREAM)
+        sock = None
+        if url.scheme == 'https':
+            context = ssl.create_default_context()
+            sock = context.wrap_socket(socket(AF_INET, SOCK_STREAM), server_hostname=url.hostname)
+        else:
+            sock = socket(AF_INET, SOCK_STREAM)
         sock.connect(server_address)
         start = timeit.default_timer()
         sock.sendall(http_request.encode())  # Send utf-8 up
@@ -103,19 +115,20 @@ class Scraper:
             "response": '...',
             "url": site_data['url'],
         }) + ")")
+        current_scheme_prefix = urlparse(site_data['url']).scheme + "://"
         split_response = site_data['response'].split('\r\n\r\n')
 
         if len(split_response) >= 2:
+            print(split_response[1])
             # Regex from:
             #   https://stackoverflow.com/questions/6038061/regular-expression-to-find-urls-within-a-string/54086404
-            all_http_or_relative_urls_regex = r'(?:(?:http):\/\/|www\.|ftp\.)(?:\([-A-Z0-9+&@#\/%=~_|$?!:,.]*\)|[' \
-                                              r'-A-Z0-9+&@#\/%=~_|$?!:,.])*(?:\([-A-Z0-9+&@#\/%=~_|$?!:,' \
-                                              r'.]*\)|[A-Z0-9+&@#\/%=~_|$])'
-            urls_on_page = re.findall(all_http_or_relative_urls_regex, split_response[1], re.IGNORECASE | re.MULTILINE)
+            all_web_or_relative_urls_regex = r'(?:(?:http|https):\/\/|www\.|ftp\.)(?:\([-A-Z0-9+&@#\/%=~_|$?!:,' \
+                                             r'.]*\)|[-A-Z0-9+&@#\/%=~_|$?!:,.])*(?:\([-A-Z0-9+&@#\/%=~_|$?!:,' \
+                                             r'.]*\)|[A-Z0-9+&@#\/%=~_|$])'
+            urls_on_page = re.findall(all_web_or_relative_urls_regex, split_response[1], re.IGNORECASE | re.MULTILINE)
             for index, url in enumerate(urls_on_page):
-                scheme_prefix = 'http://'
-                if not url.startswith(scheme_prefix):
-                    urls_on_page[index] = scheme_prefix + url
+                if not url.startswith(current_scheme_prefix):
+                    urls_on_page[index] = current_scheme_prefix + url
             return urls_on_page
 
         return []
@@ -140,7 +153,7 @@ class Scraper:
                 key, url = [(k, v) for k, v in next_element_snapshot.items()][0]
                 existing_url = db.reference('data').order_by_child('url').equal_to(url).get()
                 # Similar to queue 'pop' but follows eventual consistency model for multi-threading.
-                db.reference('queue/' + key).delete()
+                # db.reference('queue/' + key).delete() TODO Uncomment
                 # Only perform request if unvisited
                 if len(existing_url.keys()) == 0:
                     print("=========================== " + url + " ===========================")
@@ -148,7 +161,7 @@ class Scraper:
                         site_data = Scraper.get_site(url)
                         Scraper.add_site_to_firebase(site_data)
                         urls_to_add = Scraper.get_urls(site_data)
-                        Scraper.add_urls_to_queue_firebase(urls_to_add)
+                        # Scraper.add_urls_to_queue_firebase(urls_to_add)
                     except Exception as e:
                         print("Failed: ", e)
             # Wait 5 minutes before getting the next link. LOL.

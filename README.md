@@ -20,4 +20,7 @@ Do not confuse this project with the [Scrapy](https://scrapy.org/) project. This
         * `GOOGLE_APPLICATION_CREDENTIALS` to the absolute path of where you downloaded the private key
         * `FIREBASE_DATABASE_URL` to the url of your firebase realtime database you set up in 1.
 
-## To start
+## To View Populated Database
+
+Visit [https://asia-east2-socket-pyscrapy.cloudfunctions.net/data](https://asia-east2-socket-pyscrapy.cloudfunctions.net/data) to get **ALL** of the scraper's visited sites.
+Visit [https://asia-east2-socket-pyscrapy.cloudfunctions.net/data/5](https://asia-east2-socket-pyscrapy.cloudfunctions.net/data/5) to show only the first `5` results. Change `5` to anything you like. 
