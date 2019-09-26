@@ -69,9 +69,13 @@ jobs:
           command: |
             scp -r -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i "~/pyscrapy-ws-key.pem" ~/repo/* ubuntu@$SSH_HOST:/home/ubuntu/ || true
       - run:
-          name: Install, start and exit
+          name: Install
           command: |
-            ssh -o StrictHostKeyChecking=no -i "~/pyscrapy-ws-key.pem" ubuntu@$SSH_HOST 'pip3 install -r requirements.txt && GOOGLE_APPLICATION_CREDENTIALS=/home/ubuntu/firebase-adminsdk.json FIREBASE_DATABASE_URL=https://socket-pyscrapy.firebaseio.com python3 __main__.py > logs.out &' || true
+            ssh -o StrictHostKeyChecking=no -i "~/pyscrapy-ws-key.pem" ubuntu@$SSH_HOST '(pip3 install -r requirements.txt' || true
+      - run:
+          name: Start and exit
+          command: |
+            ssh -o StrictHostKeyChecking=no -i "~/pyscrapy-ws-key.pem" ubuntu@$SSH_HOST '(GOOGLE_APPLICATION_CREDENTIALS=/home/ubuntu/firebase-adminsdk.json FIREBASE_DATABASE_URL=https://socket-pyscrapy.firebaseio.com nohup python3 __main__.py > logs.out 2> errors.out) &' || true
 
 workflows:
   version: 2
