@@ -7,12 +7,11 @@ from firebase_admin import credentials, db
 from urllib.parse import urlparse
 import time
 import timeit
+from random import randrange
 import re
 
 
 class Scraper:
-    firebase_rate_limiter = 1000
-
     @staticmethod
     def get_hostname(url_string):
         """
@@ -34,14 +33,7 @@ class Scraper:
         """
         print("get_site(" + str(url_string) + ")")
         url = urlparse(url_string)
-        # Pre-Piazza HTTPS response - HTTP implementation only using low level sockets
-        # if url.scheme == 'http':
-        # raise Exception(url_string + ' is not a HTTP scheme')
-        server_address = None
-        if url.scheme == 'https':
-            server_address = (url.hostname, 443)
-        else:
-            server_address = (url.hostname, 80)
+        server_address = (url.hostname, 443) if url.scheme == 'https' else (url.hostname, 80)
         # Create http request
         http_request = 'GET /' + url_string \
             .replace(url.scheme + '://', '') \
@@ -119,7 +111,6 @@ class Scraper:
         split_response = site_data['response'].split('\r\n\r\n')
 
         if len(split_response) >= 2:
-            print(split_response[1])
             # Regex from:
             #   https://stackoverflow.com/questions/6038061/regular-expression-to-find-urls-within-a-string/54086404
             all_web_or_relative_urls_regex = r'(?:(?:http|https):\/\/|www\.|ftp\.)(?:\([-A-Z0-9+&@#\/%=~_|$?!:,' \
@@ -153,7 +144,7 @@ class Scraper:
                 key, url = [(k, v) for k, v in next_element_snapshot.items()][0]
                 existing_url = db.reference('data').order_by_child('url').equal_to(url).get()
                 # Similar to queue 'pop' but follows eventual consistency model for multi-threading.
-                # db.reference('queue/' + key).delete() TODO Uncomment
+                db.reference('queue/' + key).delete()
                 # Only perform request if unvisited
                 if len(existing_url.keys()) == 0:
                     print("=========================== " + url + " ===========================")
@@ -161,16 +152,17 @@ class Scraper:
                         site_data = Scraper.get_site(url)
                         Scraper.add_site_to_firebase(site_data)
                         urls_to_add = Scraper.get_urls(site_data)
-                        # Scraper.add_urls_to_queue_firebase(urls_to_add)
+                        Scraper.add_urls_to_queue_firebase(urls_to_add)
                     except Exception as e:
-                        print("Failed: ", e)
-            # Wait 5 minutes before getting the next link. LOL.
-            time.sleep(300)
+                        print("Failed: ", e, flush=True)
+            # Wait 5 to 30 seconds before getting the next link (so the server can't tell I'm a bot)
+            time.sleep(randrange(5, 31))
 
-        print("No more sites to scrape. Probably need to seed")
+        print("No more pages to scrape. Probably need to seed")
         return 0
 
 
+# To multi-thread, just run more times e.g. python3 __main__.py & python3 __main__.py & python3 __main__.py & ...
 def main():
     # Just use firebase to store results.
     cred = credentials.Certificate(os.environ['GOOGLE_APPLICATION_CREDENTIALS'])
