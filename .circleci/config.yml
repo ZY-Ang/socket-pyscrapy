@@ -1,0 +1,51 @@
+# Check https://circleci.com/docs/2.0/ for more details
+#
+version: 2.1
+
+defaults: &config_project_defaults
+  working_directory: ~/repo
+
+executors:
+  python_default:
+    docker:
+      - image: circleci/python:3.7.4
+
+jobs:
+  # Single deploy step that sends stuff to server
+  deploy_all:
+    <<: *config_project_defaults
+    executor: python_default
+    steps:
+      - checkout
+      - run:
+          name: Create ssh key file
+          command: echo $PYSCRAPY_WS_KEY | base64 -d > ~/pyscrapy-ws-key.pem
+      - run:
+          name: Set ssh key file permissions
+          working_directory: ~/
+          command: chmod 400 pyscrapy-ws-key.pem
+      - run:
+          name: Create firebase admin private key json credentials
+          command: echo $FIREBASE_ADMIN_JSON_KEY | base64 -d > ~/repo/firebase-adminsdk.json
+      - run:
+          name: killall processes belonging to ubuntu - stop previous scraper, if any
+          command: |
+            ssh -o StrictHostKeyChecking=no -i "~/pyscrapy-ws-key.pem" ubuntu@$SSH_HOST 'sudo killall -u ubuntu' || true
+      - run:
+          name: Delete all files
+          command: |
+            ssh -o StrictHostKeyChecking=no -i "~/pyscrapy-ws-key.pem" ubuntu@$SSH_HOST 'rm -rf ./* && ls -aL'
+      - run:
+          name: Send Files to Server
+          command: |
+            scp -r -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i "~/pyscrapy-ws-key.pem" ~/repo/* ubuntu@$SSH_HOST:/home/ubuntu/ || true
+      - run:
+          name: Install, start and exit
+          command: |
+            ssh -o StrictHostKeyChecking=no -i "~/pyscrapy-ws-key.pem" ubuntu@$SSH_HOST 'pip install -r requirements.txt && GOOGLE_APPLICATION_CREDENTIALS=/home/ubuntu/firebase-adminsdk.json FIREBASE_DATABASE_URL=https://socket-pyscrapy.firebaseio.com python3 __main__.py > logs.out & exit' || true
+
+workflows:
+  version: 2
+  master_flow:
+    jobs:
+      - deploy_all
