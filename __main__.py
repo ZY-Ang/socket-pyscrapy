@@ -132,7 +132,9 @@ class Scraper:
         print("add_url_to_queue_firebase([...len = " + str(len(urls_to_add)) + "...])")
         queue_ref = db.reference('queue')
         for url in urls_to_add:
-            queue_ref.push(url)
+            existing_url = db.reference('data').order_by_child('url').equal_to(url).get()
+            if len(existing_url.keys()) == 0:
+                queue_ref.push(url)
 
     def start(self):
         has_next_url = True
