@@ -6,15 +6,40 @@ defaults: &config_project_defaults
   working_directory: ~/repo
 
 executors:
-  python_default:
+  node_default:
     docker:
-      - image: circleci/python:3.7.4
+      - image: circleci/node:lts
 
 jobs:
-  # Single deploy step that sends stuff to server
-  deploy_all:
+  # Deploy stuff to firebase functions
+  deploy_functions:
     <<: *config_project_defaults
-    executor: python_default
+    executor: node_default
+    steps:
+      - checkout
+      # Download and cache dependencies
+      - restore_cache:
+          keys:
+            - v1-dependencies-{{ checksum "~/repo/functions/functions/package.json" }}
+            # fallback to using the latest cache if no exact match is found
+            - v1-dependencies-
+      - run:
+          working_directory: ~/repo/functions/functions
+          name: npm install
+          command: npm install
+      - save_cache:
+          paths:
+            - ~/repo/functions/functions/node_modules
+          key: v1-dependencies-{{ checksum "~/repo/functions/functions/package.json" }}
+      - run:
+          working_directory: ~/repo/functions
+          name: Publish to firebase
+          command: ./functions/node_modules/.bin/firebase deploy --token=$FIREBASE_TOKEN --only functions
+
+  # Deploy stuff to the scraping server
+  deploy_ssh:
+    <<: *config_project_defaults
+    executor: node_default
     steps:
       - checkout
       - run:
@@ -46,10 +71,11 @@ jobs:
       - run:
           name: Install, start and exit
           command: |
-            ssh -o StrictHostKeyChecking=no -i "~/pyscrapy-ws-key.pem" ubuntu@$SSH_HOST 'sudo -H pip install -r requirements.txt && GOOGLE_APPLICATION_CREDENTIALS=/home/ubuntu/firebase-adminsdk.json FIREBASE_DATABASE_URL=https://socket-pyscrapy.firebaseio.com python3 __main__.py > logs.out & exit' || true
+            ssh -o StrictHostKeyChecking=no -i "~/pyscrapy-ws-key.pem" ubuntu@$SSH_HOST 'pip3 install -r requirements.txt && GOOGLE_APPLICATION_CREDENTIALS=/home/ubuntu/firebase-adminsdk.json FIREBASE_DATABASE_URL=https://socket-pyscrapy.firebaseio.com python3 __main__.py > logs.out &' || true
 
 workflows:
   version: 2
   master_flow:
     jobs:
-      - deploy_all
+      - deploy_ssh
+      - deploy_functions

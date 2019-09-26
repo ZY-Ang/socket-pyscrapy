@@ -106,6 +106,8 @@ class Scraper:
         split_response = site_data['response'].split('\r\n\r\n')
 
         if len(split_response) >= 2:
+            # Regex from:
+            #   https://stackoverflow.com/questions/6038061/regular-expression-to-find-urls-within-a-string/54086404
             all_http_or_relative_urls_regex = r'(?:(?:http):\/\/|www\.|ftp\.)(?:\([-A-Z0-9+&@#\/%=~_|$?!:,.]*\)|[' \
                                               r'-A-Z0-9+&@#\/%=~_|$?!:,.])*(?:\([-A-Z0-9+&@#\/%=~_|$?!:,' \
                                               r'.]*\)|[A-Z0-9+&@#\/%=~_|$])'
@@ -149,7 +151,8 @@ class Scraper:
                         Scraper.add_urls_to_queue_firebase(urls_to_add)
                     except Exception as e:
                         print("Failed: ", e)
-            time.sleep(5)
+            # Wait 5 minutes before getting the next link. LOL.
+            time.sleep(300)
 
         print("No more sites to scrape. Probably need to seed")
         return 0
