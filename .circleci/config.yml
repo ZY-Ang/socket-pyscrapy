@@ -25,6 +25,10 @@ jobs:
           working_directory: ~/
           command: chmod 400 pyscrapy-ws-key.pem
       - run:
+          name: Install Pip3
+          command: |
+            ssh -o StrictHostKeyChecking=no -i "~/pyscrapy-ws-key.pem" ubuntu@$SSH_HOST 'sudo apt update && sudo apt -y install python3-pip'
+      - run:
           name: Create firebase admin private key json credentials
           command: echo $FIREBASE_ADMIN_JSON_KEY | base64 -d > ~/repo/firebase-adminsdk.json
       - run:
@@ -42,7 +46,7 @@ jobs:
       - run:
           name: Install, start and exit
           command: |
-            ssh -o StrictHostKeyChecking=no -i "~/pyscrapy-ws-key.pem" ubuntu@$SSH_HOST 'pip install -r requirements.txt && GOOGLE_APPLICATION_CREDENTIALS=/home/ubuntu/firebase-adminsdk.json FIREBASE_DATABASE_URL=https://socket-pyscrapy.firebaseio.com python3 __main__.py > logs.out & exit' || true
+            ssh -o StrictHostKeyChecking=no -i "~/pyscrapy-ws-key.pem" ubuntu@$SSH_HOST 'sudo -H pip install -r requirements.txt && GOOGLE_APPLICATION_CREDENTIALS=/home/ubuntu/firebase-adminsdk.json FIREBASE_DATABASE_URL=https://socket-pyscrapy.firebaseio.com python3 __main__.py > logs.out & exit' || true
 
 workflows:
   version: 2
