@@ -5,6 +5,7 @@ import ssl
 import firebase_admin
 from firebase_admin import credentials, db
 from urllib.parse import urlparse
+from lxml import html
 import time
 import timeit
 from random import randrange
