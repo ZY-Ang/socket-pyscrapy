@@ -25,7 +25,7 @@ httplib2==0.13.1
 hyperlink==19.0.0
 idna==2.8
 incremental==17.5.0
-lxml==4.4.1
+lxml==4.6.2
 msgpack==0.6.2
 parsel==1.5.2
 protobuf==3.9.2
